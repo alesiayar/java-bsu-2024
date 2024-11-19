@@ -17,7 +17,6 @@ public class Main {
         firstBean.doSomething();
         otherBean.doSomething();
 
-        // Метод падает, так как в классе HardCodedSingletonApplicationContext не реализовано внедрение зависимостей
-        // otherBean.doSomethingWithFirst();
+        otherBean.doSomethingWithFirst();
     }
 }

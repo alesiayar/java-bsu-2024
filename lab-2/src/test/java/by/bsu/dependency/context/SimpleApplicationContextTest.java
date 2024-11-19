@@ -1,23 +1,21 @@
 package by.bsu.dependency.context;
 
-import by.bsu.dependency.example.FirstBean;
-import by.bsu.dependency.example.OtherBean;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import by.bsu.dependency.example.*;
 import by.bsu.dependency.exceptions.ApplicationContextNotStartedException;
 import by.bsu.dependency.exceptions.NoSuchBeanDefinitionException;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 
+class SimpleApplicationContextTest {
 
-class HardCodedSingletonApplicationContextTest {
-
-    private ApplicationContext applicationContext;
+    private SimpleApplicationContext applicationContext;
 
     @BeforeEach
     void init() {
-        applicationContext = new HardCodedSingletonApplicationContext(FirstBean.class, OtherBean.class);
+        applicationContext = new SimpleApplicationContext(FirstBean.class, OtherBean.class, PrototypeBean.class, SingletonBean.class);
     }
 
     @Test
@@ -42,6 +40,12 @@ class HardCodedSingletonApplicationContextTest {
         assertThat(applicationContext.containsBean("firstBean")).isTrue();
         assertThat(applicationContext.containsBean("otherBean")).isTrue();
         assertThat(applicationContext.containsBean("randomName")).isFalse();
+    }
+
+    @Test
+    void testPostConstructCalled() {
+        applicationContext.start();
+        assertThat(((FirstBean) applicationContext.getBean("firstBean")).isPostConstructCalled).isTrue();
     }
 
     @Test
@@ -97,4 +101,62 @@ class HardCodedSingletonApplicationContextTest {
                 () -> applicationContext.isPrototype("randomName")
         );
     }
+
+    @Test
+    void testPrototype() {
+        applicationContext.start();
+
+        assertNotEquals(
+                applicationContext.getBean("prototypeBean"),
+                applicationContext.getBean("prototypeBean")
+        );
+    }
+
+    @Test
+    void testPrototypePostConstruct() {
+        applicationContext.start();
+
+        assertEquals(PrototypeBean.counter, 0);
+
+        applicationContext.getBean("prototypeBean");
+        applicationContext.getBean("prototypeBean");
+
+        assertEquals(PrototypeBean.counter, 2);
+    }
+
+    @Test
+    void testBeanNameWithoutAnnotation() {
+        applicationContext.start();
+        OtherBean otherBean = (OtherBean) applicationContext.getBean("otherBean");
+        assertNotNull(otherBean, "Bean should be created without @Bean annotation");
+    }
+
+    @Test
+    void testInitiate() {
+        assertNotNull(applicationContext.instantiateBean(FirstBean.class));
+        assertNotNull(applicationContext.instantiateBean(PrototypeBean.class));
+    }
+
+    @Test
+    void testInject() throws NoSuchFieldException, IllegalAccessException {
+        applicationContext.start();
+        PrototypeBean prototypeBean = (PrototypeBean) applicationContext.getBean("prototypeBean");
+        var singletonBeanField = prototypeBean.getClass().getDeclaredField("singletonBean");
+        singletonBeanField.setAccessible(true);
+        Object injectedSingletonBean = singletonBeanField.get(prototypeBean);
+        assertThat(injectedSingletonBean).isNotNull();
+        assertThat(injectedSingletonBean).isEqualTo(applicationContext.getBean(SingletonBean.class));
+    }
+
+    @Test
+    void TestRecursiveInject() {
+        applicationContext = new SimpleApplicationContext(Protatype1.class, Protatype2.class);
+        applicationContext.start();
+        assertThrows(
+                StackOverflowError.class,
+                () -> applicationContext.getBean("protatype2")
+        );
+    }
+
+
 }
